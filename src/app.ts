@@ -5,18 +5,22 @@ const BN = require('bn.js');
 const abiDecoder = require('abi-decoder');
 
 import { Contract } from "@ethersproject/contracts";
-import { bscHttps, pcsRouterContractAdd, pcsfContractAdd, tokenToSwap, wbnbAddress } from "./constants/constantsMainnet"
-import { logImportantMessage, sleep, sleepForSeconds, askQuestion } from "./utils/utils";
+import { bscHttps, cakeRouterContractAdd, cakeFactoryContractAdd, tokenToSwap, wbnbAddress } from "./constants/constantsMainnet"
+import { logImportantMessage, logTimestampedMessage, logTimestampedError, sleep, sleepForSeconds, askQuestion } from "./utils/utils";
 import { swapExactETHForToken, swapExactTokensForETH } from "./swap/tokenSwap"
 import { getPairInfo } from "./swap/factoryOps";
 
+
+/**
+ * Main Function
+ */
 async function main() {
   console.log("Execution started" + new Date());
 
-  const pcsFactoryAbi = fs.readFileSync('./src/config/abi/pancakeswap-factory.json', 'utf8');
-  const pcsRouterAbi = fs.readFileSync('./src/config/abi/pancakeswap-router.json', 'utf8');
+  const cakeFactoryAbi = fs.readFileSync('./src/config/abi/pancakeswap-factory.json', 'utf8');
+  const cakeRouterAbi = fs.readFileSync('./src/config/abi/pancakeswap-router.json', 'utf8');
 
-  abiDecoder.addABI(JSON.parse(pcsRouterAbi));
+  abiDecoder.addABI(JSON.parse(cakeRouterAbi));
 
   const web3 = new Web3(bscHttps);
 
@@ -38,32 +42,28 @@ async function main() {
   //###########################################################
   // this flag will decide if a trade will be made or not
   const RESPOND_TO_EVENTS = false;
-  const ETH_TO_SPEND = '0.35';
+  const ETH_TO_SPEND = '0.01';
+  const TIME_TO_MONITOR_IN_MINUTES = 60;
 
   //###########################################################
 
+  const cakeRouterContract: Contract = new web3.eth.Contract(JSON.parse(cakeRouterAbi), cakeRouterContractAdd);
+  const cakeFactoryContract: Contract = new web3.eth.Contract(JSON.parse(cakeFactoryAbi), cakeFactoryContractAdd);
 
-  const pcsRouterContract: Contract = new web3.eth.Contract(JSON.parse(pcsRouterAbi), pcsRouterContractAdd);
-  const pcsFactoryContract: Contract = new web3.eth.Contract(JSON.parse(pcsFactoryAbi), pcsfContractAdd);
+  logTimestampedMessage("monitoring started");
 
-  //let pairAddress = await getPairInfo(pcsFactoryContract, wbnbAddress, tokenToSwap);
-  //swapExactETHForToken(ETH_TO_SPEND, account, pcsRouterContract, wbnbAddress, tokenToSwap, web3);
+  if (await monitorBlockForTime(web3, cakeRouterContractAdd, TIME_TO_MONITOR_IN_MINUTES, RESPOND_TO_EVENTS) && RESPOND_TO_EVENTS) {
 
-  //return;
-
-
-  console.log("monitoring started - " + new Date().toISOString());
-  //if (await monitorBlockForTime(web3, pcsRouterContractAdd, 65, RESPOND_TO_EVENTS) && RESPOND_TO_EVENTS) {
-  if (await monitorBlockForTime(web3, pcsRouterContractAdd, 65, RESPOND_TO_EVENTS) && RESPOND_TO_EVENTS) {
+    logImportantMessage(`FOUND LIQUIDITY ADD for '${tokenToSwap}' waiting for 2 minutes`);
 
     // wait for two minutes to let bot prevention part go away
     // await sleepForSeconds(121);
-    logImportantMessage(`FOUND LIQUIDITY ADD for '${tokenToSwap}' waiting for 2 minutes`);
-    
+    swapExactETHForToken(ETH_TO_SPEND, account, cakeRouterContract, wbnbAddress, tokenToSwap, web3);
+
     //await askQuestion("Press ENTER when your want to sell tokens")
     //swapExactTokensForETH('1', account, pcsRouterContract, tokenToSwap, wbnbAddress, web3);
   }
-  console.log("monitoring ended - " + new Date().toISOString());
+  logTimestampedMessage("monitoring ended");
 }
 
 /**
@@ -114,18 +114,18 @@ async function monitorBlockForTime(web3: any, contractAddressToMonitor: string, 
       } else {
 
         // give block time to get synced
-        console.error(`${new Date().toISOString()} There was problem fetching block sleeping to allow block to sync`);
+        logTimestampedError('There was problem fetching block sleeping to allow block to sync');
         await sleep(250);
       }
 
     } catch (err) {
-      console.error(`${new Date().toISOString()} Exception occurred ${err}`);
+      logTimestampedError(`Exception occurred ${err}`);
       console.error(err);
-      console.error(`Exception occurred between block ${fromBlockNumber} - ${toBlockNumber}`);
+      logTimestampedError(`Exception occurred between block ${fromBlockNumber} - ${toBlockNumber}`);
     }
   }
   if (liquidityFound) {
-    console.log(`${new Date().toISOString()} Liquidity found at tx ${transHash}`);
+    logTimestampedMessage(`Liquidity found at tx ${transHash}`);
   }
   return liquidityFound;
 }
@@ -149,12 +149,12 @@ async function getTransactionsByAccount(web3: any, contractAddressToMonitor: str
   // transaction hash of that event
   let tranxHash = "";
 
-  //if ((toBlockNumber - startedFromBlock) % 10 == 0)
-  console.log(`${new Date().toISOString()} Searching "${tokenToSwap}" liquidity events on pancakeswap router within blocks ${fromBlockNumber} - ${toBlockNumber}`);
+  if ((toBlockNumber - startedFromBlock) % 10 == 0) {
+    logTimestampedMessage(`Searching "${tokenToSwap}" liquidity events on pancakeswap router within blocks ${fromBlockNumber} - ${toBlockNumber}`);
+  }
 
   let promiseIterable = [];
   for (let i = fromBlockNumber; i <= toBlockNumber; i++) {
-    console.log(`Block: ${i}`);
     let block = web3.eth.getBlock(i, true);
     promiseIterable.push(block);
   }
@@ -164,55 +164,58 @@ async function getTransactionsByAccount(web3: any, contractAddressToMonitor: str
   if (result.filter((block: any) => null == block).length > 0) {
     // one of the getblock operation in batch return null
     // i.e. block was not synced
-    blockFetchSuccessful = true;
+    blockFetchSuccessful = false;
   }
 
   // enter only if all blocks fetch was successful
   // else skip the block
-  if (!blockFetchSuccessful) {
+  if (blockFetchSuccessful) {
 
     let flatmappedTrans = result.flatMap((block: any) => block.transactions);
-
 
     flatmappedTrans.forEach(function (tx: any) {
       if (contractAddressToMonitor == tx.to) {
         var methodInputs = abiDecoder.decodeMethod(tx.input);
+
         try {
           if (methodInputs.name == "addLiquidityETH"
-            && tokenToSwap == methodInputs.params[0].value) {
-            console.log(`${new Date().toISOString()} ${tx.hash} - Liquidity added [${web3.utils.fromWei(methodInputs.params[2].value)} ${methodInputs.params[0].value} - ${web3.utils.fromWei(methodInputs.params[3].value)} BNB`);
+            && tokenToSwap == web3.utils.toChecksumAddress(methodInputs.params[0].value)) {
+            logTimestampedMessage(`${tx.hash} - Liquidity added [${web3.utils.fromWei(methodInputs.params[2].value)} ${methodInputs.params[0].value} - ${web3.utils.fromWei(methodInputs.params[3].value)} BNB`);
             tranxHash = tx.hash;
             addLiquidityEventFound = true;
+
           } else if (methodInputs.name == "addLiquidity"
-            && (tokenToSwap == methodInputs.params[0].value ||
-              tokenToSwap == methodInputs.params[1].value)) {
-            console.log(`${new Date().toISOString()} ${tx.hash} - Liquidity added [${web3.utils.fromWei(methodInputs.params[2].value)} ${methodInputs.params[0].value} - ${web3.utils.fromWei(methodInputs.params[3].value)} ${methodInputs.params[1].value}]`);
+            && (tokenToSwap == web3.utils.toChecksumAddress(methodInputs.params[0].value) ||
+              tokenToSwap == web3.utils.toChecksumAddress(methodInputs.params[1].value))) {
+            logTimestampedMessage(`${tx.hash} - Liquidity added [${web3.utils.fromWei(methodInputs.params[2].value)} ${methodInputs.params[0].value} - ${web3.utils.fromWei(methodInputs.params[3].value)} ${methodInputs.params[1].value}]`);
             tranxHash = tx.hash;
             addLiquidityEventFound = true;
-          } else if (!respondToEvent && methodInputs.name == "addLiquidityETH") {
-            console.log(`${new Date().toISOString()} ${tx.hash} - Liquidity added [${web3.utils.fromWei(methodInputs.params[2].value)} ${methodInputs.params[0].value} - ${web3.utils.fromWei(methodInputs.params[3].value)} BNB`);
-          } else if (!respondToEvent && methodInputs.name == "addLiquidity") {
-            console.log(`${new Date().toISOString()} ${tx.hash} - Liquidity added [${web3.utils.fromWei(methodInputs.params[2].value)} ${methodInputs.params[0].value} - ${web3.utils.fromWei(methodInputs.params[3].value)} ${methodInputs.params[1].value}]`);
+
+          } else if (!respondToEvent && methodInputs.name.toUpperCase() == "addLiquidityETH".toUpperCase()) {
+            logTimestampedMessage(`${tx.hash} - Liquidity added [${web3.utils.fromWei(methodInputs.params[2].value)} ${methodInputs.params[0].value} - ${web3.utils.fromWei(methodInputs.params[3].value)} BNB`);
+
+          } else if (!respondToEvent && methodInputs.name.toUpperCase() == "addLiquidity".toUpperCase()) {
+            logTimestampedMessage(`${tx.hash} - Liquidity added [${web3.utils.fromWei(methodInputs.params[2].value)} ${methodInputs.params[0].value} - ${web3.utils.fromWei(methodInputs.params[3].value)} ${methodInputs.params[1].value}]`);
           }
         } catch (e) {
-          console.error(`${new Date().toISOString()} Skipping invalid transaction ${tx.hash}`);
+          logTimestampedError(`Skipping invalid transaction ${tx.hash}`);
         }
 
         // Do something with the trasaction
         /*
-        console.log("  tx hash  : " + e.hash + "\n"
-          + "   nonce           : " + e.nonce + "\n"
-          + "   blockHash       : " + e.blockHash + "\n"
-          + "   blockNumber     : " + e.blockNumber + "\n"
-          + "   transactionIndex: " + e.transactionIndex + "\n"
-          + "   from            : " + e.from + "\n"
-          + "   to              : " + e.to + "\n"
-          + "   value           : " + e.value + "\n"
-          + "   time            : " + block.timestamp + " " + new Date(block.timestamp * 1000).toUTCString() + "\n"
-          + "   gasPrice        : " + e.gasPrice + "\n"
-          + "   gas             : " + e.gas + "\n"
-          + "   input           : " + abiDecoder.decodeMethod(e.input));
-      */
+        console.log("  tx hash  : " + tx.hash + "\n"
+          + "   nonce           : " + tx.nonce + "\n"
+          + "   blockHash       : " + tx.blockHash + "\n"
+          + "   blockNumber     : " + tx.blockNumber + "\n"
+          + "   transactionIndex: " + tx.transactionIndex + "\n"
+          + "   from            : " + tx.from + "\n"
+          + "   to              : " + tx.to + "\n"
+          + "   value           : " + tx.value + "\n"
+          //+ "   time            : " + block.timestamp + " " + new Date(block.timestamp * 1000).toUTCString() + "\n"
+          + "   gasPrice        : " + tx.gasPrice + "\n"
+          + "   gas             : " + tx.gas + "\n"
+          + "   input           : " + abiDecoder.decodeMethod(tx.input));
+        */
         //}
       }
     });
@@ -226,4 +229,6 @@ async function getTransactionsByAccount(web3: any, contractAddressToMonitor: str
   }
 }
 
+
+// call main method
 main();

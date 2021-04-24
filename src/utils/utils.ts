@@ -37,10 +37,31 @@ export function askQuestion(query:string) {
     }));
 }
 
+/**
+ * append timestamp to message
+ * @param message message
+ */
+export function logTimestampedMessage(message: string){
+    console.log(`${new Date().toISOString()} - ${message}`);
+}
+
+/**
+ * append timestamp to message
+ * @param message message
+ */
+ export function logTimestampedError(message: string){
+    console.error(`${new Date().toISOString()} - ${message}`);
+}
+
+
+/**
+ * Log an important message
+ * @param message message
+ */
 export function logImportantMessage(message: string) {
     console.log("")
     console.log("*******************************")
-    console.log(message)
+    console.log(logTimestampedMessage(message));
     console.log("*******************************")
     console.log("")
 }
