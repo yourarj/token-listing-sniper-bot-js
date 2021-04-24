@@ -15,13 +15,13 @@ let tempWbnbAddress = '0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c';
 export const wbnbAddress = Web3.utils.toChecksumAddress(tempWbnbAddress);
 
 // $BUSD address
-//let tempTokenToSwap = '0xe9e7cea3dedca5984780bafc599bd69add087d56';
+let tempTokenToSwap = '0xe9e7CeA3dedca5984780bafc599bd69add087d56'.toLowerCase();
 
 // $CAKE address
 //let tempTokenToSwap = '0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82';
 
 // $STACK address
-let tempTokenToSwap = '0x6855f7bb6287F94ddcC8915E37e73a3c9fEe5CF3';
+// let tempTokenToSwap = '0x6855f7bb6287F94ddcC8915E37e73a3c9fEe5CF3';
 
 // constatnt checksummed address of token to swap
 export const tokenToSwap = Web3.utils.toChecksumAddress(tempTokenToSwap)

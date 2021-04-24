@@ -61,7 +61,7 @@ export function logTimestampedMessage(message: string){
 export function logImportantMessage(message: string) {
     console.log("")
     console.log("*******************************")
-    console.log(logTimestampedMessage(message));
+    logTimestampedMessage(message);
     console.log("*******************************")
     console.log("")
 }

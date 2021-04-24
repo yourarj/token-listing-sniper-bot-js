@@ -41,7 +41,7 @@ async function main() {
   // CONSTANTS changes
   //###########################################################
   // this flag will decide if a trade will be made or not
-  const RESPOND_TO_EVENTS = false;
+  const RESPOND_TO_EVENTS = true;
   const ETH_TO_SPEND = '0.01';
   const TIME_TO_MONITOR_IN_MINUTES = 60;
 
