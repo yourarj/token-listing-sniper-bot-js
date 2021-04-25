@@ -7,7 +7,8 @@ const abiDecoder = require('abi-decoder');
 import { Contract } from "@ethersproject/contracts";
 import { bscHttps, cakeRouterContractAdd, cakeFactoryContractAdd, tokenToSwap, wbnbAddress } from "./constants/constantsMainnet"
 import { logImportantMessage, logTimestampedMessage, logTimestampedError, sleep, sleepForSeconds, askQuestion } from "./utils/utils";
-import { swapExactETHForToken, swapExactTokensForETH } from "./swap/tokenSwap"
+import { getOutputToken, swapExactETHForToken, swapExactTokensForETH } from "./swap/tokenSwap"
+import { approveSpend, checkTokenAllowance, getBalance, getSymbol } from "./utils/bep20"
 import { getPairInfo } from "./swap/factoryOps";
 
 
@@ -19,6 +20,7 @@ async function main() {
 
   const cakeFactoryAbi = fs.readFileSync('./src/config/abi/pancakeswap-factory.json', 'utf8');
   const cakeRouterAbi = fs.readFileSync('./src/config/abi/pancakeswap-router.json', 'utf8');
+  const tokenToSwapAbi = fs.readFileSync('./src/config/abi/bep-20-compatible-token.json', 'utf8');
 
   abiDecoder.addABI(JSON.parse(cakeRouterAbi));
 
@@ -41,27 +43,53 @@ async function main() {
   // CONSTANTS changes
   //###########################################################
   // this flag will decide if a trade will be made or not
-  const RESPOND_TO_EVENTS = true;
-  const ETH_TO_SPEND = '0.01';
+  const RESPOND_TO_EVENTS = false;
+  const ETH_TO_SPEND = '2';
   const TIME_TO_MONITOR_IN_MINUTES = 60;
-
+  const MONITOR_ONLY_LARGE_TXS = false // will applicable only when RESPOND_TO_EVENTS is false
   //###########################################################
 
   const cakeRouterContract: Contract = new web3.eth.Contract(JSON.parse(cakeRouterAbi), cakeRouterContractAdd);
   const cakeFactoryContract: Contract = new web3.eth.Contract(JSON.parse(cakeFactoryAbi), cakeFactoryContractAdd);
+  const tokenToSwapContract: Contract = new web3.eth.Contract(JSON.parse(tokenToSwapAbi), tokenToSwap);
 
   logTimestampedMessage("monitoring started");
 
-  if (await monitorBlockForTime(web3, cakeRouterContractAdd, TIME_TO_MONITOR_IN_MINUTES, RESPOND_TO_EVENTS) && RESPOND_TO_EVENTS) {
+  let spendAmountToAllow = web3.utils.toWei('1000000000');
+  let allowance = await checkTokenAllowance(account.address, cakeRouterContractAdd, tokenToSwapContract, web3);
+
+  if (allowance != spendAmountToAllow && RESPOND_TO_EVENTS) {
+    logTimestampedMessage(`Currently spender has allowance of '${allowance}', going for spend approval`);
+    let approveAcctionResult = await approveSpend(cakeRouterContractAdd, web3.utils.toWei('1000000000').toString(), tokenToSwapContract, account, web3);
+    if (approveAcctionResult) {
+      allowance = await checkTokenAllowance(account.address, cakeRouterContractAdd, tokenToSwapContract, web3);
+      logTimestampedMessage(`New approved spend allowance is '${allowance}'`);
+    } else {
+      logTimestampedError("spend approval failed. Kindly retry");
+      throw new Error("Spend approval failed");
+    }
+  }
+
+  if (await monitorBlockForTime(web3, cakeRouterContractAdd, TIME_TO_MONITOR_IN_MINUTES, RESPOND_TO_EVENTS, MONITOR_ONLY_LARGE_TXS) && RESPOND_TO_EVENTS) {
 
     logImportantMessage(`FOUND LIQUIDITY ADD for '${tokenToSwap}' waiting for 2 minutes`);
 
     // wait for two minutes to let bot prevention part go away
     // await sleepForSeconds(121);
-    swapExactETHForToken(ETH_TO_SPEND, account, cakeRouterContract, wbnbAddress, tokenToSwap, web3);
+    if (await swapExactETHForToken(ETH_TO_SPEND, account, cakeRouterContract, wbnbAddress, tokenToSwap, web3)) {
+      let newTokenBalanceAfterSwap = await getBalance(account.address, tokenToSwapContract, web3);
 
-    //await askQuestion("Press ENTER when your want to sell tokens")
-    //swapExactTokensForETH('1', account, pcsRouterContract, tokenToSwap, wbnbAddress, web3);
+      while (true) {
+        let expectedOutput = await getOutputToken(newTokenBalanceAfterSwap, tokenToSwap, wbnbAddress, cakeRouterContract)
+        logImportantMessage(`We spent ${ETH_TO_SPEND} and  we will get ${web3.utils.fromWei(expectedOutput)}`);
+        let ans = await askQuestion("Press ENTER when your want to sell tokens");
+        if (String(ans).toLowerCase().startsWith("y")) {
+          break;
+        }
+        await sleep(1500);
+      }
+      await swapExactTokensForETH(web3.utils.fromWei(newTokenBalanceAfterSwap).toString(), account, cakeRouterContract, tokenToSwap, wbnbAddress, web3);
+    }
   }
   logTimestampedMessage("monitoring ended");
 }
@@ -74,7 +102,7 @@ async function main() {
  * @param respondToEvents should take actions to events on blockchain
  * @returns flag if matching event found or not
  */
-async function monitorBlockForTime(web3: any, contractAddressToMonitor: string, monitorForMinutes: number, respondToEvents: boolean) {
+async function monitorBlockForTime(web3: any, contractAddressToMonitor: string, monitorForMinutes: number, respondToEvents: boolean, monitorOnlyLargeTx: boolean) {
   let startedFromBlock = 0;
   let fromBlockNumber = 0
   let toBlockNumber = 0;
@@ -101,7 +129,7 @@ async function monitorBlockForTime(web3: any, contractAddressToMonitor: string, 
         fromBlockNumber = toBlockNumber;
       }
 
-      let result = await getTransactionsByAccount(web3, contractAddressToMonitor, fromBlockNumber, toBlockNumber, startedFromBlock, respondToEvents);
+      let result = await getTransactionsByAccount(web3, contractAddressToMonitor, fromBlockNumber, toBlockNumber, startedFromBlock, respondToEvents, monitorOnlyLargeTx);
       fromBlockNumber = result.lastBlockNumber;
       liquidityFound = result.liquidityFound;
       transHash = result.transHash;
@@ -140,7 +168,7 @@ async function monitorBlockForTime(web3: any, contractAddressToMonitor: string, 
  * @param respondToEvent should respond to event and break out of loop
  * @returns liquidity info object
  */
-async function getTransactionsByAccount(web3: any, contractAddressToMonitor: string, fromBlockNumber: number, toBlockNumber: number, startedFromBlock: number, respondToEvent: boolean) {
+async function getTransactionsByAccount(web3: any, contractAddressToMonitor: string, fromBlockNumber: number, toBlockNumber: number, startedFromBlock: number, respondToEvent: boolean, monitorOnlyLargeTx: boolean) {
 
   // indicate if any block fetch operation result was null
   let blockFetchSuccessful = true;
@@ -192,10 +220,16 @@ async function getTransactionsByAccount(web3: any, contractAddressToMonitor: str
             addLiquidityEventFound = true;
 
           } else if (!respondToEvent && methodInputs.name.toUpperCase() == "addLiquidityETH".toUpperCase()) {
-            logTimestampedMessage(`${tx.hash} - Liquidity added [${web3.utils.fromWei(methodInputs.params[2].value)} ${methodInputs.params[0].value} - ${web3.utils.fromWei(methodInputs.params[3].value)} BNB`);
+            if (!monitorOnlyLargeTx) {
+              logTimestampedMessage(`${tx.hash} - Liquidity added [${web3.utils.fromWei(methodInputs.params[2].value)} ${methodInputs.params[0].value} - ${web3.utils.fromWei(methodInputs.params[3].value)} BNB`);
+            } else if (100 < web3.utils.fromWei(methodInputs.params[3].value)) {
+              logTimestampedMessage(`${tx.hash} - Big Liquidity added of ${web3.utils.fromWei(methodInputs.params[3].value)} BNB`);
+            }
 
           } else if (!respondToEvent && methodInputs.name.toUpperCase() == "addLiquidity".toUpperCase()) {
-            logTimestampedMessage(`${tx.hash} - Liquidity added [${web3.utils.fromWei(methodInputs.params[2].value)} ${methodInputs.params[0].value} - ${web3.utils.fromWei(methodInputs.params[3].value)} ${methodInputs.params[1].value}]`);
+            if (!monitorOnlyLargeTx) {
+              logTimestampedMessage(`${tx.hash} - Liquidity added [${web3.utils.fromWei(methodInputs.params[2].value)} ${methodInputs.params[0].value} - ${web3.utils.fromWei(methodInputs.params[3].value)} ${methodInputs.params[1].value}]`);
+            }
           }
         } catch (e) {
           logTimestampedError(`Skipping invalid transaction ${tx.hash}`);

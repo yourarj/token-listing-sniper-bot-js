@@ -1,4 +1,4 @@
-const Web3 = require('web3');
+import Web3 from "web3";
 const readline = require('readline');
 
 /**
@@ -15,7 +15,7 @@ export function sleep(ms: number) {
  * @param sec seconds
  * @returns resolvable promise after specified seconds
  */
-export function sleepForSeconds(sec: number){
+export function sleepForSeconds(sec: number) {
     return sleep(sec * 1000);
 }
 
@@ -25,13 +25,13 @@ export function sleepForSeconds(sec: number){
  * @param query question to ask
  * @returns answer from user
  */
-export function askQuestion(query:string) {
+export function askQuestion(query: string) {
     const rlInterface = readline.createInterface({
         input: process.stdin,
         output: process.stdout,
     });
 
-    return new Promise(resolve => rlInterface.question(query, (ans:string) => {
+    return new Promise(resolve => rlInterface.question(query, (ans: string) => {
         rlInterface.close();
         resolve(ans);
     }));
@@ -41,7 +41,7 @@ export function askQuestion(query:string) {
  * append timestamp to message
  * @param message message
  */
-export function logTimestampedMessage(message: string){
+export function logTimestampedMessage(message: string) {
     console.log(`${new Date().toISOString()} - ${message}`);
 }
 
@@ -49,7 +49,7 @@ export function logTimestampedMessage(message: string){
  * append timestamp to message
  * @param message message
  */
- export function logTimestampedError(message: string){
+export function logTimestampedError(message: string) {
     console.error(`${new Date().toISOString()} - ${message}`);
 }
 

@@ -15,13 +15,13 @@ let tempWbnbAddress = '0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c';
 export const wbnbAddress = Web3.utils.toChecksumAddress(tempWbnbAddress);
 
 // $BUSD address
-let tempTokenToSwap = '0xe9e7CeA3dedca5984780bafc599bd69add087d56'.toLowerCase();
+//let tempTokenToSwap = '0xe9e7CeA3dedca5984780bafc599bd69add087d56';
 
 // $CAKE address
 //let tempTokenToSwap = '0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82';
 
-// $STACK address
-// let tempTokenToSwap = '0x6855f7bb6287F94ddcC8915E37e73a3c9fEe5CF3';
+// $1MLN NFT address
+let tempTokenToSwap = '0xa4eF4b0B23C1fc81d3f9ecF93510e64f58A4A016';
 
 // constatnt checksummed address of token to swap
 export const tokenToSwap = Web3.utils.toChecksumAddress(tempTokenToSwap)
@@ -33,6 +33,7 @@ let tempCakeFactory = "0xBCfCcbde45cE874adCB698cC183deBcF17952812";
 export const cakeFactoryContractAdd = Web3.utils.toChecksumAddress(tempCakeFactory);
 
 // Pancakeswap Router Address
-let tempCakeRouter  = "0x05fF2B0DB69458A0750badebc4f9e13aDd608C7F";
+//let tempCakeRouter  = "0x05fF2B0DB69458A0750badebc4f9e13aDd608C7F"; //v1
+let tempCakeRouter  = "0x10ED43C718714eb63d5aA57B78B54704E256024E"; //v2
 // mainnet pancakeswap router address
 export const cakeRouterContractAdd = Web3.utils.toChecksumAddress(tempCakeRouter);
