@@ -1,5 +1,6 @@
 import Web3 from "web3";
 const readline = require('readline');
+const ebf = require("ethereum-bloom-filters");
 
 /**
  * Sleep for specified time
@@ -7,7 +8,7 @@ const readline = require('readline');
  * @returns promise which will be resolved after ms
  */
 export function sleep(ms: number) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -16,9 +17,8 @@ export function sleep(ms: number) {
  * @returns resolvable promise after specified seconds
  */
 export function sleepForSeconds(sec: number) {
-    return sleep(sec * 1000);
+  return sleep(sec * 1000);
 }
-
 
 /**
  * ask question and return result from user
@@ -26,15 +26,17 @@ export function sleepForSeconds(sec: number) {
  * @returns answer from user
  */
 export function askQuestion(query: string) {
-    const rlInterface = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout,
-    });
+  const rlInterface = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
 
-    return new Promise(resolve => rlInterface.question(query, (ans: string) => {
-        rlInterface.close();
-        resolve(ans);
-    }));
+  return new Promise((resolve) =>
+    rlInterface.question(query, (ans: string) => {
+      rlInterface.close();
+      resolve(ans);
+    })
+  );
 }
 
 /**
@@ -42,7 +44,7 @@ export function askQuestion(query: string) {
  * @param message message
  */
 export function logTimestampedMessage(message: string) {
-    console.log(`${new Date().toISOString()} - ${message}`);
+  console.log(`${new Date().toISOString()} - ${message}`);
 }
 
 /**
@@ -50,22 +52,20 @@ export function logTimestampedMessage(message: string) {
  * @param message message
  */
 export function logTimestampedError(message: string) {
-    console.error(`${new Date().toISOString()} - ${message}`);
+  console.error(`${new Date().toISOString()} - ${message}`);
 }
-
 
 /**
  * Log an important message
  * @param message message
  */
 export function logImportantMessage(message: string) {
-    console.log("")
-    console.log("*******************************")
-    logTimestampedMessage(message);
-    console.log("*******************************")
-    console.log("")
+  console.log("");
+  console.log("*******************************");
+  logTimestampedMessage(message);
+  console.log("*******************************");
+  console.log("");
 }
-
 
 /**
  * get WebsocketProvider
@@ -73,19 +73,41 @@ export function logImportantMessage(message: string) {
  * @returns WebsocketProvider
  */
 export function getWebSocketProvider(url: string) {
-    // ==========
-    // Websockets
-    // ==========
-    const wsProvider = new Web3.providers.WebsocketProvider(url, {
-        headers: {
-            Origin: "http://localhost"
-        },
-        reconnect: {
-            auto: true,
-            delay: 5000, // ms
-            maxAttempts: 15,
-            onTimeout: false
-        }
-    });
-    return wsProvider;
+  // ==========
+  // Websockets
+  // ==========
+  const wsProvider = new Web3.providers.WebsocketProvider(url, {
+    headers: {
+      Origin: "http://localhost",
+    },
+    reconnect: {
+      auto: true,
+      delay: 5000, // ms
+      maxAttempts: 15,
+      onTimeout: false,
+    },
+  });
+  return wsProvider;
+}
+
+/**
+ * Inspect logsBloom for presence of contract and address in block
+ */
+export function doesBloomContainAddresses(
+  block: any,
+  contractAddress: string,
+  tokenAddress: string
+) {
+  let isBlockPositive = false;
+    if (
+      ebf.isUserEthereumAddressInBloom(block.logsBloom, contractAddress) &&
+      ebf.isContractAddressInBloom(block.logsBloom, tokenAddress)
+    ) {
+        //console.log(block)
+      logImportantMessage(
+        `Block ${block.number} bloom return positive results`
+      );
+      isBlockPositive = true;
+    }
+    return isBlockPositive;
 }

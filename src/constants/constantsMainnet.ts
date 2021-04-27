@@ -20,14 +20,18 @@ export const wbnbAddress = Web3.utils.toChecksumAddress(tempWbnbAddress);
 // $CAKE address
 //let tempTokenToSwap = '0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82';
 
-// $1MLN NFT address
-let tempTokenToSwap = '0xa4eF4b0B23C1fc81d3f9ecF93510e64f58A4A016';
+// $SMOOTHY 7:10PM IST
+let tempTokenToSwap = '0xbF776e4FCa664D791C4Ee3A71e2722990E003283';
+
+// $REFINABLE 7:30PM IST
+//let tempTokenToSwap = '0x4e6415a5727ea08aae4580057187923aec331227';
 
 // constatnt checksummed address of token to swap
 export const tokenToSwap = Web3.utils.toChecksumAddress(tempTokenToSwap)
 
 // Pancakeswap Factory Address
-let tempCakeFactory = "0xBCfCcbde45cE874adCB698cC183deBcF17952812";
+//let tempCakeFactory = "0xBCfCcbde45cE874adCB698cC183deBcF17952812"; //v1
+let tempCakeFactory = "0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73"; //v2
 
 // mainnet pancakeswap factory address
 export const cakeFactoryContractAdd = Web3.utils.toChecksumAddress(tempCakeFactory);

@@ -23,7 +23,7 @@ export async function swapExactETHForToken(exactEth: any, account: any, contract
     let deadline = getTransactionDealine(30);
 
     const swap = contract.methods.swapExactETHForTokens(minOut.toString(), tokenPath, account.address, deadline);
-    return await sendSignedTxAndGetResult(account, contract, exactEth.toString(), swap, 1.0, web3);
+    return await sendSignedTxAndGetResult(account, contract, exactEth.toString(), swap, 10.0, web3);
 }
 
 /**
@@ -45,7 +45,7 @@ export async function swapExactETHForToken(exactEth: any, account: any, contract
     let deadline = getTransactionDealine(30);
 
     const swap = contract.methods.swapExactTokensForETH(exactTokens.toString(), minOut.toString(), tokenPath, account.address, deadline);
-    return await sendSignedTxAndGetResult(account, contract, 0, swap, 1.0, web3);
+    return await sendSignedTxAndGetResult(account, contract, 0, swap, 10.0, web3);
 }
 
 /**
