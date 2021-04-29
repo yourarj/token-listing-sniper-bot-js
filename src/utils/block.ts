@@ -1,4 +1,3 @@
-import { bscHttpsList } from "../constants/constantsMainnet";
 import {
   doesBloomContainAddresses,
   logTimestampedError,
@@ -56,7 +55,7 @@ async function monitorNewlyMinedBlocks(
     counter++;
     if (counter == providers.length) {
       counter = 0;
-      await sleep(300);
+      await sleep(100);
     }
   }
 }
@@ -105,9 +104,9 @@ export async function findLiquidityForAddressInBlock(
         block.timestamp * 1000
       ).toISOString()}`
     );
-    if (
-      doesBloomContainAddresses(block, contractAddressToMonitor, tokenToMonitor)
-    ) {
+    // if (
+    //   doesBloomContainAddresses(block, contractAddressToMonitor, tokenToMonitor)
+    // ) {
       let completeBlock: any = null;
       try {
         completeBlock = await web3.eth.getBlock(blockPointer, true);
@@ -214,7 +213,7 @@ export async function findLiquidityForAddressInBlock(
           //}
         }
       });
-    }
+    // }
     // as block scan was successful lets move pointer i to next block
     blockPointer++;
   }

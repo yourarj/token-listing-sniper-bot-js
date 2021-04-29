@@ -131,6 +131,7 @@ export function getHttpProviders(list: string[]) {
         return numberToBN(v).toString();
       }
     };
+    return web3;
   });
 }
 
