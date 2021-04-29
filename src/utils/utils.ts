@@ -1,6 +1,9 @@
+import { Contract } from "@ethersproject/contracts";
 import Web3 from "web3";
-const readline = require('readline');
+import { approveSpend, checkTokenAllowance } from "./bep20";
+const readline = require("readline");
 const ebf = require("ethereum-bloom-filters");
+const numberToBN = require("number-to-bn");
 
 /**
  * Sleep for specified time
@@ -99,15 +102,77 @@ export function doesBloomContainAddresses(
   tokenAddress: string
 ) {
   let isBlockPositive = false;
-    if (
-      ebf.isUserEthereumAddressInBloom(block.logsBloom, contractAddress) &&
-      ebf.isContractAddressInBloom(block.logsBloom, tokenAddress)
-    ) {
-        //console.log(block)
-      logImportantMessage(
-        `Block ${block.number} bloom return positive results`
+  if (
+    ebf.isUserEthereumAddressInBloom(block.logsBloom, contractAddress) &&
+    ebf.isContractAddressInBloom(block.logsBloom, tokenAddress)
+  ) {
+    //console.log(block)
+    logTimestampedMessage(`Block ${block.number} bloom return positive results`);
+    isBlockPositive = true;
+  }
+  return isBlockPositive;
+}
+
+/**
+ * Get Http Providers
+ * @param list rpc server list
+ * @returns mapped Web3 Http providers
+ */
+export function getHttpProviders(list: string[]) {
+  return list.map((rpcUrl) => {
+    let web3 = new Web3(rpcUrl);
+    // overloading following method bign issue of 53 bit
+    // observed while using getBlock method
+    web3.utils.hexToNumber = (v: any) => {
+      if (!v) return v;
+      try {
+        return numberToBN(v).toNumber();
+      } catch (e) {
+        return numberToBN(v).toString();
+      }
+    };
+  });
+}
+
+/**
+ * Do the spend approval related ceremony
+ * @param spenderAddress spender address
+ * @param tokenContract tokens willing to spend
+ * @param account account object to sign tx
+ * @param web3 web3 obj to perform operation
+ */
+export function doSpendApproval(spenderAddress:string, tokenContract: Contract, account:any, web3:any){
+  let spendAmountToAllow = web3.utils.toWei("1000000000");
+  let allowance = checkTokenAllowance(
+    account.address,
+    spenderAddress,
+    tokenContract,
+    web3
+  );
+
+  if (allowance != spendAmountToAllow) {
+    logTimestampedMessage(
+      `Currently spender has allowance of '${allowance}', going for spend approval`
+    );
+    let approveAcctionResult = approveSpend(
+      spenderAddress,
+      spendAmountToAllow.toString(),
+      tokenContract,
+      account,
+      web3
+    );
+    if (approveAcctionResult) {
+      allowance = checkTokenAllowance(
+        account.address,
+        spenderAddress,
+        tokenContract,
+        web3
       );
-      isBlockPositive = true;
+      logTimestampedMessage(`New approved spend allowance is '${allowance}'`);
+    } else {
+      logTimestampedError("spend approval failed. Kindly retry");
+      throw new Error("Spend approval failed");
     }
-    return isBlockPositive;
+  }
+
 }
