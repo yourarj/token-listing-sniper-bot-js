@@ -1,13 +1,12 @@
 const Web3 = require("web3");
 
 // mainnet https address
-//export const bscHttps = "https://apis.ankr.com/961925be316b4169aa178dc9f989b74a/09bc802376bb9bd75c33d54a2606f880/binance/full/main"
+//export const bscHttps = process.env.ankr_https
 export const bscHttps = "https://bsc-dataseed.binance.org/";
 
 // mainnet wss address
-export const bscWss =
-  "wss://apis.ankr.com/wss/961925be316b4169aa178dc9f989b74a/09bc802376bb9bd75c33d54a2606f880/binance/full/main";
-//const bscWss = "wss://bsc-ws-node.nariox.org:443"
+export const bscWss = process.env.ankr_wss
+//export const bscWss = "wss://bsc-ws-node.nariox.org:443"
 
 // $WBNB address
 let tempWbnbAddress = "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c";
@@ -19,13 +18,13 @@ export const wbnbAddress = Web3.utils.toChecksumAddress(tempWbnbAddress);
 //let tempTokenToSwap = '0xe9e7CeA3dedca5984780bafc599bd69add087d56';
 
 // $CAKE address
-let tempTokenToSwap = '0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82';
+//let tempTokenToSwap = '0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82';
 
-// $SMOOTHY 7:10PM IST
-//let tempTokenToSwap = '0xbF776e4FCa664D791C4Ee3A71e2722990E003283';
+// $bRing address
+//let tempTokenToSwap = '0x939d5a13cf0074586a2dcf17bc692b2d3ccdd517';
 
-// $REFINABLE 7:30PM IST
-//let tempTokenToSwap = "0x4e6415a5727ea08aae4580057187923aec331227";
+// $tsx address
+let tempTokenToSwap = "0x270388e0ca29cfd7c7e73903d9d933a23d1bab39";
 
 // constatnt checksummed address of token to swap
 export const tokenToSwap = Web3.utils.toChecksumAddress(tempTokenToSwap);

@@ -21,6 +21,7 @@ import {
   askQuestion,
   getHttpProviders,
   doSpendApproval,
+  getWebSocketProvider,
 } from "./utils/utils";
 import {
   getOutputToken,
@@ -55,7 +56,7 @@ async function main() {
   abiDecoder.addABI(JSON.parse(cakeRouterAbi));
 
   const web3 = new Web3(bscHttps);
-  const web3Wss = new Web3(bscWss);
+  const web3Wss = new Web3(getWebSocketProvider(bscWss));
 
   const cakeRouterContract: Contract = new web3.eth.Contract(
     JSON.parse(cakeRouterAbi),
@@ -78,131 +79,92 @@ async function main() {
   // CONSTANTS changes
   //###########################################################
   // this flag will decide if a trade will be made or not
-  const RESPOND_TO_EVENTS = false;
-  const ETH_TO_SPEND = "0.45";
+  const RESPOND_TO_EVENTS = true;
+  const ETH_TO_SPEND = "0.01";
   const TIME_TO_MONITOR_IN_MINUTES = 1;
   const MONITOR_ONLY_LARGE_TXS = false; // will applicable only when RESPOND_TO_EVENTS is false
   //###########################################################
 
-  // web3Wss.eth.subscribe("newBlockHeaders", function (error: any, block: any) {
-  //   logTimestampedMessage(
-  //     `fetched block mined at ${block.timestamp}- ${new Date(
-  //       block.timestamp * 1000
-  //     ).toISOString()}`
-  //   );
-  // });
-
-  // await sleep(1 * 60 * 1000);
-
-  // return;
-
-  let providers = await getHttpProviders(bscHttpsList);
+  let ano = await getPairInfo(cakeFactoryContract, tokenToSwap, wbnbAddress);
+  logImportantMessage(`Pair address ${ano}`);
 
   // this emitter will notify if we found any liquidity add events
   let liquidityEventEmitter = new EventEmitter();
 
-  logTimestampedMessage("monitoring started");
-
-  if (RESPOND_TO_EVENTS) {
-    doSpendApproval(cakeRouterContractAdd, tokenToSwapContract, account, web3);
-  }
-
-  let blockEventListener = await watchForNewBlocks(
-    providers,
-    TIME_TO_MONITOR_IN_MINUTES
-  );
-
-  //new block listener
-  let lastBlockNumber = await web3.eth.getBlockNumber();
-  blockEventListener.on("new_block", (fetchInfo: any) => {
-    if (fetchInfo.blockNumber > lastBlockNumber) {
-      logTimestampedMessage(
-        `${fetchInfo.fetchedAt.toISOString()} - ${fetchInfo.blockNumber} - ${
-          fetchInfo.server
-        }`
-      );
-      for (
-        let counter = lastBlockNumber;
-        counter < fetchInfo.blockNumber;
-        counter++
-      )
-        findLiquidityForAddressInBlock(
-          fetchInfo.web3Instance,
-          abiDecoder,
-          cakeRouterContractAdd,
-          tokenToSwap,
-          counter,
-          counter,
-          RESPOND_TO_EVENTS,
-          MONITOR_ONLY_LARGE_TXS,
-          liquidityEventEmitter
-        ).catch((error) => logTimestampedError(error));
-
-      lastBlockNumber = fetchInfo.blockNumber;
-    }
+  liquidityEventEmitter.once("liquidity_added", (liquidityEvent: any) => {
+    // swapExactETHForToken(
+    //   "0.001",
+    //   account,
+    //   cakeRouterContract,
+    //   wbnbAddress,
+    //   liquidityEvent.token,
+    //   1.0,
+    //   web3
+    // );
+    logImportantMessage("In event liquidity found");
+    console.log(liquidityEvent);
   });
 
-  let pairAddress = await getPairInfo(
-    cakeFactoryContract,
-    tokenToSwap,
-    wbnbAddress
-  );
-  logImportantMessage(`Pair address ${pairAddress}`);
-
-  // act on liquidity add event
-  liquidityEventEmitter.on("liquidity_added", (liquidity_info: any) => {
-    logImportantMessage("LIQUIDITY FOUND");
-    logTimestampedMessage(`Liquidity info: ${JSON.stringify(liquidity_info)}`);
-    if (RESPOND_TO_EVENTS) {
-      // wait for two minutes to let bot prevention part go away
-      // await sleepForSeconds(121);
-      if (
-        swapExactETHForToken(
-          ETH_TO_SPEND,
-          account,
-          cakeRouterContract,
-          wbnbAddress,
-          tokenToSwap,
-          web3
-        )
-      ) {
-        let newTokenBalanceAfterSwap = getBalance(
-          account.address,
-          tokenToSwapContract,
-          web3
-        ).then((newTokenBalanceAfterSwap) => {
-          while (true) {
-            let expectedOutput = getOutputToken(
-              newTokenBalanceAfterSwap,
-              tokenToSwap,
-              wbnbAddress,
-              cakeRouterContract
-            );
-            logImportantMessage(
-              `We spent ${ETH_TO_SPEND} and  we will get ${web3.utils.fromWei(
-                expectedOutput
-              )}`
-            );
-            let ans = askQuestion("Press ENTER when your want to sell tokens");
-            if (String(ans).toLowerCase().startsWith("y")) {
-              break;
+  logTimestampedMessage("Going to subscribe...")
+  let subscribeResponse = web3Wss.eth
+    .subscribe(
+      "pendingTransactions",
+      function (error: any, pendingTransaction: any) {
+        logTimestampedMessage(`first interaction - ${pendingTransaction}`);
+        web3.eth
+          .getTransaction(pendingTransaction)
+          .then((tx: any) => {
+            if (
+              null != tx &&
+              null != tx.to &&
+              tx.to.toLowerCase() == cakeRouterContractAdd.toLowerCase()
+            ) {
+              logTimestampedMessage(`pancake tx: ${tx.hash}`);
+              //TODO remove return statement after verifying transactions to cakerouter
+              return;
+              var methodInputs = abiDecoder.decodeMethod(tx.input);
+              if (
+                (methodInputs.name == "addLiquidity" &&
+                  (tokenToSwap ==
+                    web3.utils.toChecksumAddress(
+                      methodInputs.params[0].value
+                    ) ||
+                    tokenToSwap ==
+                      web3.utils.toChecksumAddress(
+                        methodInputs.params[1].value
+                      ))) ||
+                (methodInputs.name == "addLiquidityETH" &&
+                  tokenToSwap ==
+                    web3.utils.toChecksumAddress(methodInputs.params[0].value))
+              ) {
+                logTimestampedMessage(
+                  `Liquidity found @ ${pendingTransaction}`
+                );
+                liquidityEventEmitter.emit("liquidity_added", {
+                  tx: pendingTransaction,
+                  token: web3.utils.toChecksumAddress(
+                    methodInputs.params[0].value
+                  ),
+                });
+              }
+            } else if (null == tx) {
+              logTimestampedError(
+                `fetching transaction ${pendingTransaction} returned null`
+              );
             }
-            sleep(500);
-          }
-          swapExactTokensForETH(
-            web3.utils.fromWei(newTokenBalanceAfterSwap).toString(),
-            account,
-            cakeRouterContract,
-            tokenToSwap,
-            wbnbAddress,
-            web3
-          );
-        });
+          })
+          .catch((error: any) => {
+            logTimestampedError(
+              `problem fetching transaction ${pendingTransaction}`
+            );
+            console.error(error);
+          });
       }
-    }
-  });
-
-  logTimestampedMessage("monitoring ended");
+    )
+    .on("connected", (data: any) =>
+      logTimestampedMessage(`Subscribed successfully ${JSON.stringify(data)}`)
+    )
+    .on("error", (error: any) => console.error(error));
 }
 
 // call main method

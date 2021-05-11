@@ -11,7 +11,7 @@ import { logImportantMessage, logTimestampedMessage } from "../utils/utils";
  * @param web3 
  * @returns boolean representing success of operation
  */
-export async function swapExactETHForToken(exactEth: any, account: any, contract: Contract, wBnbAddress: string, tokenToGet: string, web3:any) {
+export async function swapExactETHForToken(exactEth: any, account: any, contract: Contract, wBnbAddress: string, tokenToGet: string, txFeeFactor:number, web3:any) {
     exactEth = Web3.utils.toWei(exactEth);
     let tokenPath = [wBnbAddress, tokenToGet];
     let availableReserves = await contract.methods.getAmountsOut(exactEth.toString(), tokenPath).call();
@@ -23,7 +23,7 @@ export async function swapExactETHForToken(exactEth: any, account: any, contract
     let deadline = getTransactionDealine(30);
 
     const swap = contract.methods.swapExactETHForTokens(minOut.toString(), tokenPath, account.address, deadline);
-    return await sendSignedTxAndGetResult(account, contract, exactEth.toString(), swap, 10.0, web3);
+    return await sendSignedTxAndGetResult(account, contract, exactEth.toString(), swap, txFeeFactor, web3);
 }
 
 /**
@@ -33,7 +33,7 @@ export async function swapExactETHForToken(exactEth: any, account: any, contract
  * @param web3 
  * @returns boolean depending on success of operation
  */
- export async function swapExactTokensForETH(exactTokens: any, account: any, contract: Contract, tokenToSpend: string, wBnbAddress:string, web3:any) {
+ export async function swapExactTokensForETH(exactTokens: any, account: any, contract: Contract, tokenToSpend: string, wBnbAddress:string, txFeeFactor:number, web3:any) {
     exactTokens = Web3.utils.toWei(exactTokens);
     let tokenPath = [tokenToSpend, wBnbAddress];
     let availableReserves = await contract.methods.getAmountsOut(exactTokens.toString(), tokenPath).call();
@@ -45,7 +45,7 @@ export async function swapExactETHForToken(exactEth: any, account: any, contract
     let deadline = getTransactionDealine(30);
 
     const swap = contract.methods.swapExactTokensForETH(exactTokens.toString(), minOut.toString(), tokenPath, account.address, deadline);
-    return await sendSignedTxAndGetResult(account, contract, 0, swap, 10.0, web3);
+    return await sendSignedTxAndGetResult(account, contract, 0, swap, txFeeFactor, web3);
 }
 
 /**

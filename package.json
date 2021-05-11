@@ -22,8 +22,10 @@
     "typescript": "^4.2.4"
   },
   "scripts": {
-    "pretest": "npx tsc",
-    "test": "node -r tsconfig-paths/register ./bin/app.js > app.log 2>app.error.log",
+    "renamelogfile": "node -e \"require('fs').rename('log/app.log', `log/app.${new Date().getTime()}.log`, function(err) { if (err) console.log(err); console.log('App log file successfully renamed!') })\"",
+    "renameerrorfile": "node -e \"require('fs').rename('log/app.error.log', `log/app.error.${new Date().getTime()}.log`, function(err) { if (err) console.log(err); console.log('App error log file successfully renamed!') })\"",
+    "pretest": "npm run renamelogfile && npm run renameerrorfile && npx tsc",
+    "test": "node -r tsconfig-paths/register ./bin/app.js > ./log/app.log 2>./log/app.error.log",
     "preprod": "npx tsc",
     "prod": "node -r tsconfig-paths/register ./bin/app.js"
   },
